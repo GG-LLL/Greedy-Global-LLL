@@ -1,5 +1,5 @@
 # Greedy-Global-LLL
-# Contributors: Sanjay Bhattacherjee and Jack Moyler
+Contributors: Sanjay Bhattacherjee and Jack Moyler
 
 This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL".
  The algorithms implemented are: Pot-DeepLLL[2], SS-DeepLLL[3], and their Greedy-Global variants proposed in the above paper.
