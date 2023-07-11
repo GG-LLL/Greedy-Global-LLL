@@ -40,4 +40,4 @@ References:
  [5] Sanjay Bhattacherjee, Julio Hernandez-Castro and Jack Moyler. A Greedy Global Framework for LLL, Cryptology ePrint Archive, Paper 2023/261.
 
 Contributors:
- Sanjay Bhattacherjee and Jack Moyler
+ Sanjay Bhattacherjee (sanjay.bhattacherjee@gmail.com) and Jack Moyler ()
