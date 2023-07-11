@@ -15,16 +15,19 @@ For a given input basis, the functions contained in common.cpp may be used to ru
   - Pot-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
   - SS-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
 
-- generate_SVP_basis.cpp  
+- generate_SVP_bases.cpp  
 Can be used to generate SVP Challenge style bases. 
 
 - collate.cpp  
 Can be used to collate the results from multiple output files in one place.
 
-- SVP_Bases &ensp; SVP_Outputs  
-The input bases are contained in the zip file SVP_Bases, while their respective outputs are contained within SVP_Outputs.
+- SVP_Bases &ensp; SVP_Bases_FPLLL &ensp; SVP_Bases_LLLReduced 
+The input bases are contained in the zip file SVP_Bases. The same bases are in the zip file SVP_Bases_FPLLL, formatted for the use of FPLLL functions. The zip file SVP_Bases_LLLReduced contains the SVP_Bases in the other files, but 0.99-LLL reduced.
 
-- Averages  
+- SVP_Outputs_Standalone &ensp; SVP_Outputs_Preprocessed
+The outputs from our programs are contained in the zip files SVP_Outputs_Standalone and SVP_Outputs_Preprocessed for multi-precision and standard implementations respectively.
+
+- Standalone_Averages &ensp; Preprocessed_Averages 
 This folder contains the summaries reported in our paper.
 
 References:
