@@ -1,8 +1,8 @@
 # Greedy-Global-LLL
 
 This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL".
- The algorithms implemented are: Pot-DeepLLL[2], SS-DeepLLL[3], and their Greedy-Global variants proposed in the above paper.
- The Pot-DeepLLL and SS-DeepLLL algorithms use the GSO update techniques from [4].
+ The algorithms implemented are: Pot-DeepLLL[2], SS-DeepLLL[3], and their Greedy-Global variants proposed in the above paper[5].
+ The Pot-DeepLLL and SS-DeepLLL algorithms use the GSO update techniques from [4], that make them very efficienct.
 
 The descriptions of the files that can be found in this repository are listed below.
 
