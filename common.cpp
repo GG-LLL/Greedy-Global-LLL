@@ -156,6 +156,25 @@ int setPrecision(int m) {
 	return 0;
 }
 
+// Deallocate ppBasis
+int deleteBasis (int ** ppBasis, int n) {
+   for (int i=0; i<n; i++) {
+      free (ppBasis[i]);
+   }
+   free (ppBasis);
+   return 0;
+}
+
+// Deallocate ppBasisDouble
+template <typename T1>
+int deleteBasisDouble (T1 ** ppBasisDouble, int n) {
+   for (int i=0; i<n; i++) {
+      free (ppBasisDouble[i]);
+   }
+   free (ppBasisDouble);
+   return 0;
+}
+
 // Compute SVP Challenge factor
 RR SVP_Challenge_Factor(int n, ZZ volume) {
    	RR n_RR;
@@ -287,6 +306,16 @@ mat_ZZ generateNTLChallengeBasis (int n) {
    return NTLBasis;   
 }
 
+// Find the inner products of vectors pV1 with pV2
+template <typename T1, typename T2>
+long double inner_product_template (T1 * pV1, T2 * pV2, int m) {
+   long double result = 0;
+   for (int i=0; i<m; i++) {
+      result += (long double)pV1[i] * (long double)pV2[i];
+   }
+   return result;
+}
+
 // Compute norm of a vec_ZZ
 RR NTL_vector_norm (vec_ZZ V1, int m) {
    ZZ norm_squared;
@@ -296,6 +325,22 @@ RR NTL_vector_norm (vec_ZZ V1, int m) {
    SqrRoot(norm, RR_norm_squared);
 
    return norm;
+}
+
+// Reduce vector pV2 with pV1
+int reduce (int * pV1, int * pV2, int m, int closest_integer_to_mu) {
+   for (int i=0; i<m; i++) {
+      pV2[i] -= closest_integer_to_mu * pV1[i];
+   }
+   return 0;
+}
+
+template <typename T1>
+int reduceDouble (T1 * pVDouble1, T1 * pVDouble2, int m, T1 mu) {
+   for (int i=0; i<m; i++) {
+      pVDouble2[i] -= mu * pVDouble1[i];
+   }
+   return 0;
 }
 
 // Reduce vec_ZZ V2 with vec_ZZ V1 (only NTL)
@@ -308,7 +353,21 @@ int NTL_reduce (vec_ZZ& V1, vec_ZZ& V2, int m, ZZ closest_ZZ_to_mu) {
    return 0;
 }
 
-// Copy mat_ZZ ppBasis to mat_ZZ BasisNTL and return
+// Copy int **ppBasis to mat_ZZ BasisNTL and return
+mat_ZZ copyBasisToNTL (int ** ppBasis, int m, int n) {
+   mat_ZZ BasisNTL;
+
+   BasisNTL.SetDims(n,m);
+   for (int i=0; i<m; i++) {
+      for (int j=0; j<n; j++) {
+         BasisNTL[i][j] = ppBasis[i][j];
+      }
+   }
+   return BasisNTL;
+}
+
+
+// Copy mat_ZZ ppBasis to mat_RR BasisNTL and return
 mat_RR copyNTLBasisToRR (mat_ZZ ppBasis, int m, int n) {
    mat_RR BasisRR;
 
@@ -319,6 +378,21 @@ mat_RR copyNTLBasisToRR (mat_ZZ ppBasis, int m, int n) {
       }
    }
    return BasisRR;
+}
+
+// Copy pBasis into ppBasisDouble and return
+long double ** copyBasisToDouble (int ** ppBasis, int m, int n) {
+   long double ** ppBasisDouble;
+   // Create the 2-dimensional array
+   ppBasisDouble = (long double **) calloc (n, sizeof(long double *));
+   for (int i=0; i<n; i++) {
+      ppBasisDouble[i] = (long double *) calloc (m, sizeof(long double));
+      // Copy the values
+      for (int j=0; j<m; j++) {
+         ppBasisDouble[i][j] = (long double) ppBasis[i][j];
+      }
+   }
+   return ppBasisDouble;
 }
 
 //  Rounds a/d to nearest integer, breaking ties
@@ -354,6 +428,28 @@ int ExactDiv(ZZ& qq, const ZZ& a, const ZZ& b) {
    	return 0;
 }
 
+// Gram-Schmidt Orthogonalisation
+long double ** GSO (int ** pBasis, int m, int n) {
+   long double ** ppBasisGSO;
+   ppBasisGSO = copyBasisToDouble (pBasis, m, n);
+
+   for (int i=1; i<n; i++) {
+      for (int j=i-1; j>=0; j--) {
+
+         // Find the value of mu_ij
+         long double mu_ij =
+                 inner_product_template (pBasis[i], ppBasisGSO[j], m) /
+                 inner_product_template (ppBasisGSO[j], ppBasisGSO[j], m);
+
+         // Reduce vector ppBasisGSO[i] with ppBasisGSO[j]
+         // Compute b_i - mu_ij x b_j*
+         reduceDouble (ppBasisGSO[j], ppBasisGSO[i], m, mu_ij);
+      }
+   }
+   return ppBasisGSO;
+}
+
+// Gram-Schmidt Orthogonalisation (NTL datatypes)
 mat_RR GSO_RR (mat_ZZ ppBasis, int m, int n) {
    mat_RR ppBasisGSO;
    mat_RR ppBasisRR;
@@ -380,6 +476,92 @@ mat_RR GSO_RR (mat_ZZ ppBasis, int m, int n) {
      }
   }
   return ppBasisGSO; 
+}
+
+// Update the GSO information in the way required for DeepLLL
+// Algorithm 4 in Yamaguchi Yasuda NuTMic paper (NuTMic 2017)
+template <typename T1>
+int deep_LLL_GSO_update (T1 ** ppM, T1 * pB, int k , int i, int n) {
+   // Initialise arrays pP, pS, pD as described in [YY18]
+   T1 * pP;
+   pP = (T1 *) calloc (n, sizeof(T1));
+   T1 * pS;
+   pS = (T1 *) calloc (n, sizeof(T1));
+   T1 * pD;
+   pD = (T1 *) calloc (n, sizeof(T1));
+
+   for (int j=0; j<n; j++) {
+      pP[j] = 0.0;
+      pS[j] = 0.0;
+      pD[j] = 0.0;
+   }
+
+
+   pP[k] = pB[k];
+   pD[k] = pB[k];
+
+   // Lines 2-4 of Algorithm 4 in YY18
+   for (int j=k-1; j>=i; j--) {
+      pP[j] = ppM[k][j] * pB[j];
+      pD[j] = pD[j+1] + (ppM[k][j]*pP[j]);
+   }
+
+   // Line 5 of Algorithm 4 in YY18 - Intialising values of S
+   for (int j=i; j<n; j++) {
+      pS[j] = (T1) 0.0;
+   }
+
+   // Lines 6 - 18 of Algorithm 4 in YY18
+   for (int j=k; j>i; j--) {
+      T1 T = 0.0;
+      T = ppM[k][j-1] / pD[j];
+      for (int l=n-1; l>k;l--) {
+         pS[l] = pS[l] + (ppM[l][j] * pP[j]);
+         ppM[l][j] = ppM[l][j-1] - (T * pS[l]);
+      }
+
+      for (int l=k; l>=j+2;l--) {
+         pS[l] = pS[l] + (ppM[l-1][j] * pP[j]);
+         ppM[l][j] = ppM[l-1][j-1] - (T * pS[l]);
+      }
+
+      if (j != k) {
+         pS[j+1] = pP[j];
+         ppM[j+1][j] = ppM[j][j-1] - (T * pS[j+1]);
+      }
+   }
+
+   // Lines 20 - 22 of Algorithm 4 in YY18
+   T1 T = 0.0;
+   T = (T1) 1.0 / pD[i];
+
+
+   for (int l=n-1; l>k; l--) {
+      ppM[l][i] = T * (pS[l] + ppM[l][i] * pP[i]);
+   }
+   for (int l=k; l>=i+2; l--) {
+      ppM[l][i] = T * (pS[l] + ppM[l-1][i] * pP[i]);
+   }
+
+   // Lines 23 - 29 of Algorithm 4 in YY18
+   ppM[i+1][i] = T * pP[i];
+
+   for (int j=0; j<i; j++) {
+      T1 epsilon = 0.0;
+      epsilon = ppM[k][j];
+      for (int l=k; l>i; l--) {
+         ppM[l][j] = ppM[l-1][j];
+      }
+         ppM[i][j] = epsilon;
+   }
+
+   // Lines 31 - 32 of Algorithm 4 in YY18
+   for (int j=k; j>i;j--) {
+      pB[j] = (pD[j] * pB[j-1]) / pD[j-1];
+   }
+   pB[i] = pD[i];
+
+   return 0;
 }
 
 // Update the GSO information in the way required for DeepLLL (RR datatypes)
@@ -468,7 +650,57 @@ int deep_LLL_GSO_update_RR (mat_RR &ppM, vec_RR &pB, int k , int i, int n) {
    return 0;
 }
 
-RR RR_find_insertion_indices_dynamic_SSLLL (mat_RR ppM, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ) {
+// Find the indices k,i where we perform a deep insertion for SS-GGLLL (standard C datatypes)
+template <typename T1>
+T1 find_insertion_indices_SSGGLLL (T1 ** ppM, int ** ppBasis, T1 * pB, int n, int m, int * pK, int * pJ) {
+
+   int k_max = 1;
+   int i_max = 0;
+
+   T1 S_max = 0.0;
+   T1 S_ik = 0.0;
+
+   // For k = 1,...,n and j = k-1,...,1,0, we find the indices k, i where we insert b_k to reduce the value of SS the most
+   for (int k=1; k<n; k++) {
+      // Initialise to the k-1 case
+      T1 delta_k_1 = 0.0;
+      delta_k_1 = (pB[k] + (ppM[k][k-1] * ppM[k][k-1] * pB[k-1])) / pB[k-1];
+
+      // Initialise D_j = D_{k-1}
+      T1 D_j = 0.0;
+      D_j = (ppM[k][k-1] * ppM[k][k-1] * pB[k-1]) + pB[k];
+
+      // Initialise S_ik = S_{i-1,k}
+      // After initialising S and D, we can update them in the 'for' loop below for general S_jk and D_j for 0 <= j < k-1
+      T1 S_ik = 0.0;
+      S_ik = ppM[k][k-1] * ppM[k][k-1] * (1 - delta_k_1);
+
+      // Check if k, k-1 case improves upon current best
+      if (S_ik > S_max) {
+         S_max = S_ik;
+         k_max = k;
+         i_max = k-1;
+      }
+
+      for (int l=k-2; l>=0; l--) {
+         D_j += ppM[k][l] * ppM[k][l] * pB[l];
+         S_ik += ppM[k][l] * ppM[k][l] * pB[l] * ((pB[l]/D_j) - 1);
+
+         if (S_ik > S_max) {
+            k_max = k;
+            i_max = l;
+            S_max = S_ik;
+         }
+      }
+   }
+   *pK = k_max;
+   *pJ = i_max;
+
+   return S_max;
+}
+
+
+RR RR_find_insertion_indices_SSGGLLL (mat_RR ppM, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ) {
 
    int k_max = 1;
    int i_max = 0;
@@ -519,8 +751,54 @@ RR RR_find_insertion_indices_dynamic_SSLLL (mat_RR ppM, mat_ZZ ppBasis, vec_RR p
    return S_max;
 }
 
-// Find insertion indices for Dynamic PotLLL (using NTL datatypes)
-RR RR_find_insertion_indices_dynamic_PotLLL (mat_RR ppM, mat_RR ppDelta, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ) {
+// Find insertion indices for Pot-GGLLL (standard C datatypes) 
+long double find_insertion_indices_PotGGLLL (long double ** ppM, int ** ppBasis, long double * pB, int n, int m, int * pK, int * pJ) {
+
+   int k_min = 0;
+   int i_min = 0;
+
+   // Initialise P = 1.0, P_min = 1.0
+   // We reinitialise P to be 1.0 every time we increment k (in standard PotLLL, for each k, we start with P = 1)
+   long double P = 1.0;
+   long double P_min = 1.0;
+
+   // Initialise P_min to be the k=1, i=0 case
+   long double P_init = 1.0;
+   P_init = (pB[1] + ppM[1][0]*ppM[1][0]*pB[0]) / pB[0];
+
+   if (P_init < P_min) {
+      P_min = P_init;
+      k_min = 1;
+      i_min = 0;
+   }
+   long double sum = 0.0;
+   long double P_mult = 0.0;
+   for (int k=2;k<n;k++) {
+      P = 1;
+      for (int j=k-1; j>=0; j--) {
+	 sum = 0.0;
+         for (int r=j; r<k; r++) {
+            sum += ppM[k][r]*ppM[k][r]*pB[r];
+         }
+
+         P_mult = (pB[k] + sum) / pB[j];
+         P = P * P_mult;
+         if (P<P_min) {
+            k_min = k;
+            i_min = j;
+            P_min = P;
+         }
+      }
+   }
+
+   *pK = k_min;
+   *pJ = i_min;
+
+   return P_min;
+}
+
+// Find insertion indices for Pot-GGLLL (using NTL datatypes)
+RR RR_find_insertion_indices_PotGGLLL (mat_RR ppM, mat_RR ppDelta, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ) {
 
    int k_min = 0;
    int i_min = 0;
@@ -917,21 +1195,6 @@ mat_ZZ LLL_mat_ZZ (mat_ZZ ppBasis, int m, int n, RR delta, long long int * pSwap
    return ppBasis;
 }
 
-mat_ZZ BKZ_NTL (mat_ZZ BasisNTL, int m, int n, RR delta, long blocksize, long verbose) {
-   mat_ZZ U;
-   double delta_double;
-   conv(delta_double, delta);
-   long prune;
-   prune = 0;
-
-   // If not FP, use QP, QP1, XD then RR
-   BKZ_RR (BasisNTL, U, delta_double, blocksize, prune, 0,  verbose);
-
-   U.kill();
-   return BasisNTL;
-
-}
-
 // The PotLLL implementation with NTL datatypes
 // At every iteration, find insert the vector b_k position i such that the basis potential reduces by a sufficiently large amount
 mat_ZZ NTL_PotLLL (mat_ZZ ppBasis, int m, int n, RR delta, long long int * pSwaps, long long int * pReductions) {
@@ -1070,9 +1333,7 @@ mat_ZZ NTL_PotLLL (mat_ZZ ppBasis, int m, int n, RR delta, long long int * pSwap
    return ppBasis;
 }
 
-//----------------------------------------------------------------------------
-//
-// The S^2LLL implementation using NTL Datatypes
+// The SS-LLL implementation using NTL Datatypes
 // At every iteration, find insert the vector b_k position i such that the value of S^2 reduces as much as possible
 mat_ZZ NTL_SS_LLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps, long long int * pReductions) {
 
@@ -1221,7 +1482,7 @@ mat_ZZ NTL_SS_LLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps,
    return ppBasis;
 }
 
-// The dynamic PotLLL implementation with NTL datatypes
+// The Pot-GGLLL implementation with NTL datatypes
 // At every iteration, find indices k, i such that the Potential of the basis is reduced by the largest amount.
 // When this happens we insert b_k in position i
 mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long int * pSwaps, long long int * pReductions) {
@@ -1277,7 +1538,7 @@ mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long
       #endif
    }
 
-   // The dynamic LLL task
+   // The greedy global LLL task
    *pSwaps = 0;
    *pReductions = 0;
    RR P_min;
@@ -1316,9 +1577,9 @@ mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long
    int k = 0;
    int i = 0;
 
-   P_min = RR_find_insertion_indices_dynamic_PotLLL (ppM, ppDelta, ppBasis, pB, n, m, &k, &i);
+   P_min = RR_find_insertion_indices_PotGGLLL (ppM, ppDelta, ppBasis, pB, n, m, &k, &i);
    #ifdef __DEBUG__
-   printf ("\n\n\nPotLLL_dynamic_delta: P_min=%Lf\n\n\n", P_min);
+   printf ("\n\n\nPotGGLLL: P_min=%Lf\n\n\n", P_min);
    #endif
 
    while (P_min < delta_threshold) {
@@ -1393,7 +1654,7 @@ mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long
       }
       #endif
       // Update k
-      P_min = RR_find_insertion_indices_dynamic_PotLLL (ppM, ppDelta, ppBasis, pB, n, m, &k, &i);
+      P_min = RR_find_insertion_indices_PotGGLLL (ppM, ppDelta, ppBasis, pB, n, m, &k, &i);
    }
 
    ppM.kill();
@@ -1403,7 +1664,7 @@ mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long
    return ppBasis;
 }
 
-// The dynamic SSLLL implementation with NTL datatypes
+// The SS-GGLLL implementation with NTL datatypes
 // At every iteration, find indices k, i such that SS(B) - SS(C) is maximised (i.e. max reduction of SS over all indices).
 // When this happens we insert b_k in position i
 mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps, long long int * pReductions) {
@@ -1457,7 +1718,7 @@ mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps
       #endif
    }
 
-   // The dynamic LLL task
+   // The greedy global LLL task
    RR S_max, SS_sub_S_max;
    S_max = 0;
    RR squared_sum;
@@ -1498,7 +1759,7 @@ mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps
    int k = 0;
    int i = 0;
    //cout << "Basis After Size-Reduction: " << endl << ppBasis << endl;
-   S_max = RR_find_insertion_indices_dynamic_SSLLL (ppM, ppBasis, pB, n, m, &k, &i);
+   S_max = RR_find_insertion_indices_SSGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
    //#ifdef __DEBUG__
    // cout << "SS(B) - SS(C) = " << S_max << endl;
    //#endif
@@ -1581,7 +1842,7 @@ mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps
 
       // Update k
      // ppBasisInt = copyNTLBasisToInt(ppBasis, m, n);
-      S_max = RR_find_insertion_indices_dynamic_SSLLL (ppM, ppBasis, pB, n, m, &k, &i);
+      S_max = RR_find_insertion_indices_SSGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
    }
 
    ppM.kill();
@@ -1589,4 +1850,657 @@ mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps
    ppBasisRR.kill();
    
    return ppBasis;
+}
+
+// The SS-GGLLL implementation with standard C datatypes
+// At every iteration, find indices k, i such that SS(B) - SS(C) is maximised (i.e. max reduction of SS over all indices).
+// When this happens we insert b_k in position i
+int ** SSGGLLL_std (int ** ppBasis, int m, int n, long double eta, long long int * pSwaps, long long int * pReductions) {
+   	long double eta_p = 0;
+   	eta_p = 1 - eta;
+
+	long double ** ppBasisGSO;
+	ppBasisGSO = GSO (ppBasis, m, n);
+	long double ** ppBasisDouble;
+	ppBasisDouble = copyBasisToDouble (ppBasis, m, n);
+	long double ** ppM;
+	ppM = (long double **) calloc (n, sizeof(long double *));
+   	for (int i=0; i<n; i++) {
+   		ppM[i] = (long double *) calloc (m, sizeof(long double));
+	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\n\nThe GSO of the basis is:\n");
+	printBasisDoubleAsColumns(ppBasisGSO, m, n);
+   	#endif
+
+   	// This 1-dimensional array pB will store all the values of ||b_i*||^2
+   	long double * pB;
+   	pB = (long double *) calloc (m, sizeof(long double));
+
+   	#ifdef __DEBUG__
+   	printf ("\nThe values of ||b_i*||^2 are:\n");
+   	#endif
+
+   	for (int i=0; i<n; i++) {
+     		pB[i] = inner_product_template(ppBasisGSO[i], ppBasisGSO[i], m);
+      		#ifdef __DEBUG__
+      		cout << pB[i] << endl;
+      		#endif
+   	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\nThe values of mu_ij are:");
+   	#endif
+
+	long double inner = 0;
+
+   	for (int i=1; i<n; i++) {
+      		for (int j=0; j<i; j++) {
+	 		inner = inner_product_template(ppBasisDouble[i], ppBasisGSO[j], m);
+         		ppM[i][j] = inner / pB[j];
+
+         		#ifdef __DEBUG__
+         		cout << ppM[i][j] << " ";
+         		#endif
+      		}
+      	#ifdef __DEBUG__
+     	printf ("\n");
+      	#endif
+   	}
+
+   	// The greedy global LLL task
+   	long double S_max = 0;
+        long double SS_sub_S_max = 0;
+   	long double squared_sum = 0;
+
+	long double bound = 0;
+
+	for (int i=0; i<n; i++) {
+      		squared_sum += pB[i];
+   	}
+
+	SS_sub_S_max = squared_sum;
+
+	int closest_integer = 0;
+	long double closest_integer_Lf = 0.0;
+	// First reduce every vector by all its previous vectors
+   	for (int k=1; k<n; k++) {
+
+      		// Reduce b_k with all the previous basis vectors
+      		for (int j=k-1; j>=0; j--) {
+         		closest_integer = CLOSEST_INTEGER(ppM[k][j]);
+			closest_integer_Lf = (long double) closest_integer;
+	 		if (closest_integer != 0) {
+            			// Count the number of reductions
+            			(*pReductions)++;
+            			// Reduce b_k with b_j
+            			reduce (ppBasis[j], ppBasis[k], m, closest_integer);
+
+            			// mu_ki -= CLOSEST_INTEGER (mu_kj)
+            			for (int i=j-1; i>=0; i--) {
+               				// By Exercise 17.4.4 from Galbraith v2
+               				ppM[k][i] -= closest_integer_Lf * ppM[j][i];
+            			}
+
+            			// mu_kj = mu_kj - [mu_kj]
+            			ppM[k][j] -= closest_integer_Lf;
+         		}
+      		}
+   	}
+
+	// Find the index where there is a potential swap
+ 	int k = 0;
+   	int i = 0;
+
+	S_max = find_insertion_indices_SSGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
+
+	bound = eta_p * squared_sum;
+	long double SS_recomputed = 0;
+
+      	int * pTemp;
+   	pTemp = (int *) calloc (m, sizeof(int));
+
+
+   	while (S_max > bound) {
+
+      		pTemp = ppBasis[k];
+
+      		for (int j=k-1; j>=i; j--) {
+         		ppBasis[j+1] = ppBasis[j];
+      		}
+
+		ppBasis[i] = pTemp;
+
+      		// Update values of ppM, pB
+      		deep_LLL_GSO_update (ppM, pB, k , i, n);
+
+      		// Update squared_sum
+      		SS_sub_S_max -= S_max;
+      		SS_recomputed = 0;
+      		for (int i=0; i<n; i++) {
+        		SS_recomputed += pB[i];
+      		}
+      		squared_sum = SS_recomputed;
+
+		// Count the number of swaps
+      		(*pSwaps)++;
+
+      		// Reduce every vector b_{l}, i <= l < n, by all its previous vectors b_{k-1} ... b_{l-1}
+      		// Full size reduction or partial size reduction here?
+      		//for (int l=1; l<n; l++)
+      		for (int l=i; l<n; l++) {
+        	 // Reduce b_l with all the previous basis vectors
+        		for (int j=l-1; j>=0; j--) {
+	    			closest_integer = CLOSEST_INTEGER(ppM[l][j]);
+				closest_integer_Lf = (long double) closest_integer;
+	    			if (closest_integer != 0) {
+               				// Count the number of reductions
+               				(*pReductions)++;
+               				// Reduce b_l with b_j
+               				reduce (ppBasis[j], ppBasis[l], m, closest_integer);
+
+               				// mu_li -= CLOSEST_INTEGER (mu_lj)
+               				for (int i=j-1; i>=0; i--) {
+                  				// By Exercise 17.4.4 from Galbraith v2
+                  				ppM[l][i] -= closest_integer_Lf * ppM[j][i];
+               				}
+
+        	       			// mu_lj = mu_lj - [mu_lj]
+               				ppM[l][j] -= closest_integer_Lf;
+	    			}
+         		}
+      		}
+
+		//cout << "Basis after Size-Reduction: " << endl << ppBasis << endl;
+
+		#ifdef __DEBUG__
+      		printf ("\nThe Basis vectors are:\n");
+      		cout << ppBasis << endl;
+      		printf ("\nThe values of mu_ij are:");
+      		for (int i=0; i<n; i++) {
+         		for (int j=0; j<i; j++) {
+            			cout << ppM[i][j] << endl;
+         		}
+         		printf ("\n");
+      		}
+      		#endif
+
+      		// Update k
+      		S_max = find_insertion_indices_SSGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
+		bound = eta_p * squared_sum;
+   	}
+   	deleteBasisDouble(ppM, n);
+   	deleteBasisDouble(ppBasisGSO, n);
+   	deleteBasisDouble(ppBasisDouble, n);
+
+   	return ppBasis;
+}
+
+// The SS-LLL implementation with standard C datatypes
+// At every iteration, find insert the vector b_k position i such that the value of S^2 reduces as much as possible
+int ** SS_LLL_std (int ** ppBasis, int m, int n, long double eta, long long int * pSwaps, long long int * pReductions) {
+
+   	long double eta_p = 0;
+   	eta_p = 1 - eta;
+
+	long double ** ppBasisGSO;
+	ppBasisGSO = GSO (ppBasis, m, n);
+	long double ** ppBasisDouble;
+	ppBasisDouble = copyBasisToDouble (ppBasis, m, n);
+	long double ** ppM;
+	ppM = (long double **) calloc (n, sizeof(long double *));
+   	for (int i=0; i<n; i++) {
+   		ppM[i] = (long double *) calloc (m, sizeof(long double));
+	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\n\nThe GSO of the basis is:\n");
+	printBasisDoubleAsColumns(ppBasisGSO, m, n);
+   	#endif
+
+   	// This 1-dimensional array pB will store all the values of ||b_i*||^2
+   	long double * pB;
+   	pB = (long double *) calloc (m, sizeof(long double));
+
+   	#ifdef __DEBUG__
+   	printf ("\nThe values of ||b_i*||^2 are:\n");
+   	#endif
+
+   	for (int i=0; i<n; i++) {
+     		pB[i] = inner_product_template(ppBasisGSO[i], ppBasisGSO[i], m);
+      		#ifdef __DEBUG__
+      		cout << pB[i] << endl;
+      		#endif
+   	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\nThe values of mu_ij are:");
+   	#endif
+
+	long double inner = 0;
+
+   	for (int i=1; i<n; i++) {
+      		for (int j=0; j<i; j++) {
+	 		inner = inner_product_template(ppBasisDouble[i], ppBasisGSO[j], m);
+         		ppM[i][j] = inner / pB[j];
+
+         		#ifdef __DEBUG__
+         		cout << ppM[i][j] << " ";
+         		#endif
+      		}
+      	#ifdef __DEBUG__
+     	printf ("\n");
+      	#endif
+   	}
+
+	// The S^2LLL task
+   	*pSwaps = 0;
+   	*pReductions = 0;
+   	int k = 1;
+	int closest_integer = 0;
+
+	long double delta_k_1 = 0.0;
+	long double D_j = 0.0;
+	long double S_ik = 0.0;
+	long double S_lk = 0.0;
+
+	int * pTemp;
+   	pTemp = (int *) calloc (m, sizeof(int));
+
+   	while (k<n) {
+      		long double squared_sum = 0;
+
+		for (int i=0; i<n; i++) {
+         		squared_sum += pB[i];
+      		}
+
+      		// Reduce b_k with all previous basis vectors
+      		for (int j=k-1; j>=0; j--) {
+	 		closest_integer = CLOSEST_INTEGER(ppM[k][j]);
+
+	 		if (closest_integer != 0) {
+            			// Count the number of reductions
+            			(*pReductions)++;
+            			// Reduce b_k with b_j
+            			reduce (ppBasis[j], ppBasis[k], m, closest_integer);
+
+            			// mu_ki -= CLOSEST_INTEGER (mu_kj);
+            			for (int i = j-1; i>=0; i--) {
+               				// By Exercise 17.4.4 from Galbraith v2
+               				ppM[k][i] -= closest_integer * ppM[j][i];
+            			}
+
+            			// mu_kj = mu_kj - [mu_kj]
+            			ppM[k][j] -= closest_integer;
+         		}
+     	 	}
+
+      		// For j = k-1,...,1,0, we find the index i where we insert b_k to reduce the value of SS the most
+      		delta_k_1 = (pB[k] + (ppM[k][k-1] * ppM[k][k-1] * pB[k-1])) / pB[k-1];
+
+      		// Initialise D_j = D_{k-1}
+      		D_j = (ppM[k][k-1] * ppM[k][k-1] * pB[k-1]) + pB[k];
+
+      		// Initialise S_ik = S_{i-1,k}
+      		// After initialising S and D, we can update them in the 'for' loop below for general S_jk and D_j for 0 <= j < k-1
+      		S_ik = ppM[k][k-1] * ppM[k][k-1] * (1 - delta_k_1);
+
+      		int i = k-1;
+
+      		S_lk = S_ik;
+
+      		for (int l=k-2; l>=0; l--) {
+        		D_j += ppM[k][l] * ppM[k][l] * pB[l];
+         		S_lk += ppM[k][l] * ppM[k][l] * pB[l] * ((pB[l]/D_j) - 1);
+
+         		if (S_lk > S_ik) {
+            			i = l;
+            			S_ik = S_lk;
+         		}
+      		}
+
+      		if (S_ik <= eta_p * squared_sum) {
+         		k++;
+      		} else {
+         		// b_l <- b_k, and vectors b_l, ... , b_k-1 are shifted up one position
+         		pTemp = ppBasis[k];
+
+         		for (int j=k-1; j>=i; j--) {
+            			ppBasis[j+1] = ppBasis[j];
+         		}
+
+			ppBasis[i] = pTemp;
+
+         		// Update values of ppM, pB
+         		(*pSwaps)++;
+
+         		deep_LLL_GSO_update (ppM, pB, k , i, n);
+         		k = (1 >(i)) ? 1 : i;
+      		}
+   	}
+  	deleteBasisDouble(ppM, n);
+  	deleteBasisDouble(ppBasisGSO, n);
+   	deleteBasisDouble(ppBasisDouble, n);
+
+   	return ppBasis;
+}
+
+// The PotLLL implementation with standard C datatypes
+// At every iteration, find insert the vector b_k position i such that the basis potential reduces by a sufficiently large amount
+int ** Pot_LLL_std (int ** ppBasis, int m, int n, long double delta, long long int * pSwaps, long long int * pReductions) {
+
+	long double ** ppBasisGSO;
+	ppBasisGSO = GSO (ppBasis, m, n);
+	long double ** ppBasisDouble;
+	ppBasisDouble = copyBasisToDouble (ppBasis, m, n);
+	long double ** ppM;
+	ppM = (long double **) calloc (n, sizeof(long double *));
+   	for (int i=0; i<n; i++) {
+   		ppM[i] = (long double *) calloc (m, sizeof(long double));
+	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\n\nThe GSO of the basis is:\n");
+	printBasisDoubleAsColumns(ppBasisGSO, m, n);
+   	#endif
+
+   	// This 1-dimensional array pB will store all the values of ||b_i*||^2
+   	long double * pB;
+   	pB = (long double *) calloc (m, sizeof(long double));
+
+   	#ifdef __DEBUG__
+   	printf ("\nThe values of ||b_i*||^2 are:\n");
+   	#endif
+
+   	for (int i=0; i<n; i++) {
+     		pB[i] = inner_product_template(ppBasisGSO[i], ppBasisGSO[i], m);
+      		#ifdef __DEBUG__
+      		cout << pB[i] << endl;
+      		#endif
+   	}
+
+   	#ifdef __DEBUG__
+   	printf ("\n\nThe values of mu_ij are:");
+   	#endif
+
+	long double inner = 0;
+
+   	for (int i=1; i<n; i++) {
+      		for (int j=0; j<i; j++) {
+	 		inner = inner_product_template(ppBasisDouble[i], ppBasisGSO[j], m);
+         		ppM[i][j] = inner / pB[j];
+
+         		#ifdef __DEBUG__
+         		cout << ppM[i][j] << " ";
+         		#endif
+      		}
+      	#ifdef __DEBUG__
+     	printf ("\n");
+      	#endif
+   	}
+
+   	// The PotLLL task
+   	*pSwaps = 0;
+   	*pReductions = 0;
+   	int k = 1;
+   	long double C = 0.0;
+   	int temp = 0;
+	int closest_integer = 0;
+	long double closest_integer_Lf = 0.0;
+
+	long double P = 1.0;
+	long double P_min = 1.0;
+	int l = 1;
+	long double sum = 0.0;
+	long double P_mult = 0.0;
+	int * pTemp;
+   	pTemp = (int *) calloc (m, sizeof(int));
+
+   	while (k<n) {
+      		// Reduce b_k with all previous basis vectors
+      		for (int j=k-1; j>=0; j--) {
+	 		closest_integer = CLOSEST_INTEGER(ppM[k][j]);
+        		closest_integer_Lf = (long double) closest_integer;
+	 		if (closest_integer != 0) {
+            			// Count the number of reductions
+            			(*pReductions)++;
+            			// Reduce b_k with b_j
+            			reduce (ppBasis[j], ppBasis[k], m, closest_integer);
+
+            			// mu_ki -= CLOSEST_INTEGER (mu_kj);
+            			for (int i = j-1; i>=0; i--) {
+               				// By Exercise 17.4.4 from Galbraith v2
+               				ppM[k][i] -= closest_integer_Lf * ppM[j][i];
+            			}
+
+            			// mu_kj = mu_kj - [mu_kj]
+            			ppM[k][j] -= closest_integer_Lf;
+         		}
+      		}
+
+      		// Initialise P = 1, P_min = 1, k = 0
+      		// For j = k-1,...,1,0, we find the index where an insertion of vector b_k in position j reduces the potential the most
+      		P = 1;
+      		P_min = 1;
+      		l = 1;
+
+      		for (int j=k-1; j>=0; j--) {
+	 		sum = 0.0;
+         		for (int r=j; r<k; r++) {
+            			sum += ppM[k][r]*ppM[k][r]*pB[r];
+         		}
+
+         		P_mult = (pB[k] + sum) / pB[j];
+         		P = P * P_mult;
+         		if (P<P_min) {
+            			l = j;
+            			P_min = P;
+         		}
+      		}
+
+      		#ifdef __DEBUG__
+      		printf ("\nP_min = %Lf", P_min);
+      		#endif
+
+      		if (delta > P_min) {
+         		// b_l <- b_k, and vectors b_l, ... , b_k-1 are shifted up one position
+         		pTemp = ppBasis[k];
+
+         		for (int j=k-1; j>=l; j--) {
+            			ppBasis[j+1] = ppBasis[j];
+         		}
+         		ppBasis[l] = pTemp;
+
+         		// Update values of ppM[i][j] for j<i, pB[i]
+         		(*pSwaps)++;
+
+         		deep_LLL_GSO_update (ppM, pB, k , l, n);
+
+         		k = (1 > (l)) ? 1 : l;
+         	} else {
+         	k++;
+      		}
+   	}
+   	deleteBasisDouble(ppM, n);
+   	deleteBasisDouble(ppBasisGSO, n);
+   	deleteBasisDouble(ppBasisDouble, n);
+
+   	return ppBasis;
+}
+
+// The Pot-GGLLL implementation with standard C datatypes
+// At every iteration, find indices k, i such that the Potential of the basis is reduced by the largest amount.
+// When this happens we insert b_k in position i
+int ** PotGGLLL_std (int ** ppBasis, int m, int n, long double delta_threshold, long long int * pSwaps, long long int * pReductions) {
+
+	long double ** ppBasisGSO;
+	ppBasisGSO = GSO (ppBasis, m, n);
+	long double ** ppBasisDouble;
+	ppBasisDouble = copyBasisToDouble (ppBasis, m, n);
+	long double ** ppM;
+	ppM = (long double **) calloc (n, sizeof(long double *));
+   	for (int i=0; i<n; i++) {
+   		ppM[i] = (long double *) calloc (m, sizeof(long double));
+	}
+
+
+   	#ifdef __DEBUG__
+ 	printf ("\n\n\nThe GSO of the basis is:\n");
+ 	cout << ppBasisGSO;
+ 	#endif
+
+   	// This 1-dimensional array pB will store all the values of ||b_i*||^2
+   	long double * pB;
+   	pB = (long double *) calloc (m, sizeof(long double));
+
+   	#ifdef __DEBUG__
+   	printf ("\nThe values of ||b_i*||^2 are:\n");
+   	#endif
+
+	for (int i=0; i<n; i++) {
+     		pB[i] = inner_product_template(ppBasisGSO[i], ppBasisGSO[i], m);
+      		#ifdef __DEBUG__
+      		cout << pB[i] << endl;
+      		#endif
+	}
+
+   	#ifdef __DEBUG__
+  	 printf ("\n\nThe values of mu_ij are:");
+   	#endif
+
+  	for (int i=1; i<n; i++) {
+      		for (int j=0; j<i; j++) {
+	 		long double inner;
+         		inner = inner_product_template(ppBasisDouble[i], ppBasisGSO[j], m);
+	 		ppM[i][j] = inner / pB[j];
+         		#ifdef __DEBUG__
+         		cout << ppM[i][j] << endl;
+         		#endif
+      		}
+      		#ifdef __DEBUG__
+      		printf ("\n");
+      		#endif
+   	}
+
+	// The greedy global LLL task
+   	*pSwaps = 0;
+   	*pReductions = 0;
+   	long double P_min = 0;
+        int closest_integer = 0;
+	long double closest_integer_Lf = 0.0;
+
+   	// First reduce every vector by all its previous vectors
+   	for (int k=1; k<n; k++) {
+
+   	   // Reduce b_k with all the previous basis vectors
+   		for (int j=k-1; j>=0; j--) {
+	 		closest_integer = CLOSEST_INTEGER(ppM[k][j]);
+        		closest_integer_Lf = (long double) closest_integer;
+
+		 	if (closest_integer != 0) {
+         			// Count the number of reductions
+            			(*pReductions)++;
+            			// Reduce b_k with b_j
+            			reduce (ppBasis[j], ppBasis[k], m, closest_integer);
+
+            			// mu_ki -= CLOSEST_INTEGER (mu_kj)
+            			for (int i=j-1; i>=0; i--) {
+               				// By Exercise 17.4.4 from Galbraith v2
+               				ppM[k][i] -= closest_integer_Lf * ppM[j][i];
+            			}
+
+            			// mu_kj = mu_kj - [mu_kj]
+            			ppM[k][j] -= closest_integer_Lf;
+	 		}
+      		}
+   	}
+
+   	// Find the index where there is a potential swap
+   	int k = 0;
+   	int i = 0;
+
+	int * pTemp;
+   	pTemp = (int *) calloc (m, sizeof(int));
+
+
+   	P_min = find_insertion_indices_PotGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
+   	#ifdef __DEBUG__
+   	printf ("\n\n\nPotGGLLL: P_min=%Lf\n\n\n", P_min);
+   	#endif
+
+   	while (P_min < delta_threshold) {
+
+      		#ifdef __DEBUG__
+      		printf ("Insertion at k=%d, i=%d for delta=%Lf\n", k, i, P_min);
+      		#endif
+
+      		pTemp = ppBasis[k];
+
+      		for (int j=k-1; j>=i; j--) {
+         		ppBasis[j+1] = ppBasis[j];
+      		}
+
+		ppBasis[i] = pTemp;
+
+         	// Update values of ppM, pB
+      		deep_LLL_GSO_update (ppM, pB, k , i, n);
+
+
+      		// Count the number of swaps
+      		(*pSwaps)++;
+
+
+      		// Reduce every vector b_{l}, i <= l < n, by all its previous vectors b_{k-1} ... b_{l-1}
+      		// Full size reduction or partial size reduction here?
+
+		for (int l=i; l<n; l++) {
+
+			// Reduce b_l with all the previous basis vectors
+         		// for (int j=k-1; j<=l-1; j++)
+         		// for (int j=l-1; j>=k-1; j--)
+
+			for (int j=l-1; j>=0; j--) {
+	    			closest_integer = CLOSEST_INTEGER(ppM[l][j]);
+        			closest_integer_Lf = (long double) closest_integer;
+
+	    			if (closest_integer != 0) {
+               				// Count the number of reductions
+               				(*pReductions)++;
+               				// Reduce b_l with b_j
+               				reduce (ppBasis[j], ppBasis[l], m, closest_integer);
+
+               				// mu_li -= CLOSEST_INTEGER (mu_lj)
+               				for (int i=j-1; i>=0; i--) {
+                  				// By Exercise 17.4.4 from Galbraith v2
+                  				ppM[l][i] -= closest_integer_Lf * ppM[j][i];
+               				}
+
+               				// mu_lj = mu_lj - [mu_lj]
+               				ppM[l][j] -= closest_integer_Lf;
+	    			}
+         		}
+      		}
+
+      		#ifdef __DEBUG__
+      		printf ("\nThe Basis vectors are:\n");
+      		cout << ppBasis;
+      		printf ("\nThe values of mu_ij are:");
+      		for (int i=0; i<n; i++) {
+         		for (int j=0; j<i; j++) {
+            			cout << ppM[i][j] << endl;
+         		}
+
+			printf ("\n");
+      		}
+      		#endif
+
+		// Update k
+      		P_min = find_insertion_indices_PotGGLLL (ppM, ppBasis, pB, n, m, &k, &i);
+   	}
+	deleteBasisDouble (ppM, n);
+	deleteBasisDouble (ppBasisGSO, n);
+	deleteBasisDouble (ppBasisDouble, n);
+
+   	return ppBasis;
 }
