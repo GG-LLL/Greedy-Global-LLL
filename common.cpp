@@ -3,7 +3,7 @@
  *              Contains definitions of all common functions required
  *              for lattice-based cryptography
 
- * Copyright (C) 2023; Jack Moyler, Sanjay Bhattacherjee.
+ * Copyright (C) 2023; Sanjay Bhattacherjee, Jack Moyler.
 
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
