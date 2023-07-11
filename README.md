@@ -1,6 +1,6 @@
 # Greedy-Global-LLL
 
-This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL" (draft at https://eprint.iacr.org/2023/261).
+This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL".
  The algorithms implemented are: Pot-DeepLLL [2], SS-DeepLLL [3], and their Greedy-Global variants proposed in [5].
  The Pot-DeepLLL, SS-DeepLLL, Pot-GGLLL and SS-GGLLL algorithms use the GSO update techniques from [4], that make them more efficient than BKZ-8!
  SS-GGLLL gives shorter vectors than BKZ-12 for dimensions 100 and after.
@@ -40,7 +40,7 @@ References:
  
  [4] Junpei Yamaguchi and Masaya Yasuda. Explicit formula for gram-schmidt vectors in LLL with deep insertions and its applications. In Jerzy Kaczorowski, Josef Pieprzyk, and Jacek Pomykala, editors, Number-Theoretic Methods in Cryptology, pages 142–160, Cham, 2018. Springer International Publishing.
  
- [5] Sanjay Bhattacherjee, Julio Hernandez-Castro and Jack Moyler. A Greedy Global Framework for LLL, Cryptology ePrint Archive, Paper 2023/261.
+ [5] Sanjay Bhattacherjee, Julio Hernandez-Castro and Jack Moyler. A Greedy Global Framework for LLL, Cryptology ePrint Archive, Paper 2023/261, https://eprint.iacr.org/2023/261.
 
 Contributors:
  Sanjay Bhattacherjee (sanjay.bhattacherjee@gmail.com) and Jack Moyler (j.d.moyler@gmail.com)
