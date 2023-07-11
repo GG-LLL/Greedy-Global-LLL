@@ -2,18 +2,18 @@
 
 This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL".
  The algorithms implemented are: Pot-DeepLLL [2], SS-DeepLLL [3], and their Greedy-Global variants proposed in [5].
- The Pot-DeepLLL, SS-DeepLLL, Pot-GGLLL and SS-GGLLL algorithms use the GSO update techniques from [4], that make them more efficienct than BKZ-8!
+ The Pot-DeepLLL, SS-DeepLLL, Pot-GGLLL and SS-GGLLL algorithms use the GSO update techniques from [4], that make them more efficient than BKZ-8!
  SS-GGLLL gives shorter vectors than BKZ-12 for dimensions 100 and after.
 
 The descriptions of the files that can be found in this repository are listed below.
 
-- common.cpp &ensp; common.h &ensp; individual_basis_reduction.cpp  
-For a given input basis, the functions contained in common.cpp may be used to run various lattice basis reduction algorithms. The menu-driven execution of individual algorithms is in individual_basis_reduction.cpp.
- - LLL (multi-precision implementation with overestimated precision)
- - Pot-DeepLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
- - SS-DeepLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
- - Pot-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
- - SS-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
+- common.cpp &ensp; common.h &ensp; standalone_reduction.cpp &ensp; preprocessed_reduction.cpp
+For a given input basis, the functions contained in common.cpp may be used to run various lattice basis reduction algorithms. The menu-driven execution of individual algorithms is in standalone_reduction.cpp and preprocessed_reduction.cpp for multi-precision and standard datatype implementations respectively.
+  - LLL (multi-precision implementation with overestimated precision)
+  - Pot-DeepLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
+  - SS-DeepLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
+  - Pot-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
+  - SS-GGLLL (standard datatype implementation and multi-precision implementation with overestimated precision)
 
 - generate_SVP_basis.cpp  
 Can be used to generate SVP Challenge style bases. 
