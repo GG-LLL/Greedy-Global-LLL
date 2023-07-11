@@ -1,6 +1,6 @@
 # Greedy-Global-LLL
 
-This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL".
+This repository contains implementations accompanying the paper [5] titled "A Greedy Global Framework for LLL" (draft at https://eprint.iacr.org/2023/261).
  The algorithms implemented are: Pot-DeepLLL [2], SS-DeepLLL [3], and their Greedy-Global variants proposed in [5].
  The Pot-DeepLLL, SS-DeepLLL, Pot-GGLLL and SS-GGLLL algorithms use the GSO update techniques from [4], that make them more efficient than BKZ-8!
  SS-GGLLL gives shorter vectors than BKZ-12 for dimensions 100 and after.
