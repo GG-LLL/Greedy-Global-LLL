@@ -34,7 +34,9 @@
 #define _PARENT_DIR_ "../generate_SVP_bases"
 #define _PARENT_INPUT_DIR_ "../generate_SVP_bases"
 #define _PARENT_OUTPUT_DIR_ "../SVP_Outputs"
+#define _PARENT_OUTPUT_DIR_PREPROCESSED_ "../SVP_Outputs_Preprocessed"
 #define _INPUT_DIR_ "SVP_Bases"
+#define _INPUT_DIR_FPLLL_RED_ "SVP_Bases_LLLReduced"
 #define _INPUT_FILE_PREFIX_ "SVP_Basis"
 #define _OUTPUT_FILE_PREFIX_ "out"
 
@@ -43,10 +45,6 @@
 #define _SS_GGLLL_    "SS_GGLLL"
 #define _Pot_LLL_     "Pot_LLL"
 #define _Pot_GGLLL_   "Pot_GGLLL"
-#define _BKZ_08_      "BKZ_08"
-#define _BKZ_10_      "BKZ_10"
-#define _BKZ_12_      "BKZ_12"
-#define _BKZ_20_      "BKZ_20"
 
 using namespace std;
 using namespace NTL;
@@ -61,12 +59,21 @@ using namespace NTL;
 #define MASK_MSB_INT ((unsigned int)(1<<(NO_BITS_INT-1)))
 #define MASK_MSB_DOUBLE ((unsigned int)(1<<(NO_BITS_DOUBLE-1)))
 #define ALL_ONE_INT ((unsigned int)(((MASK_MSB_INT-1)<<1)+1))
-#define ALL_ONE_DOUBLE ((unsigned int)(((MASK_MSB_DOUBLE-1)<<1)+1))
+#define ALL_ONE_DOUBLE ((unsigned int)(((MASK_MSB_DOUBLE-1)<<1)+1))o
+
+#define CLOSEST_INTEGER(X) ( (X>0) ?  ((long double)((long double)X - (int)X) > ((long double)0.51))? (int)X + 1: (int)X : ((long double)((long double)X - (int)X) < ((long double)-0.51))? ((int)X - 1): (int)X )
 
 #define LC (Bi, Bj, delta, mu_ij) ((Bi >= ((delta - (mu_ij*mu_ij)) * Bj)) ? TRUE : FALSE)
 
 // Set precision of ZZ and RR
 int setPrecision(int m);
+
+// Deallocate ppBasis
+int deleteBasis (int ** ppBasis, int n);
+
+// Deallocate ppBasisDouble
+template <typename T1>
+int deleteBasisDouble (T1 ** ppBasisDouble, int n);
 
 // Compute SVP Challenge factor
 RR SVP_Challenge_Factor(int n, ZZ volume);
@@ -91,14 +98,29 @@ int compare (const void * a, const void * b);
 // Generate a random NTL basis (mat_ZZ) with n integer vectors, each of dimension m
 mat_ZZ generateNTLChallengeBasis (int n);
 
+// Find the inner products of vectors pV1 with pV2
+template <typename T1, typename T2>
+long double inner_product_template (T1 * pV1, T2 * pV2, int m);
+
 // Compute norm of a vec_ZZ
 RR NTL_vector_norm (vec_ZZ V1, int m);
+
+// Reduce vector pV2 with pV1
+int reduce (int * pV1, int * pV2, int m, int closest_integer_to_mu);
+template <typename T1>
+int reduceDouble (T1 * pVDouble1, T1 * pVDouble2, int m, T1 mu);
 
 // Reduce vec_ZZ V2 with vec_ZZ V1 (only NTL)
 int NTL_reduce (vec_ZZ& V1, vec_ZZ& V2, int m, ZZ closest_ZZ_to_mu);
 
-// Copy mat_ZZ ppBasis to mat_ZZ BasisNTL and return
+// Copy int **ppBasis to mat_ZZ BasisNTL and return
+mat_ZZ copyBasisToNTL (int ** ppBasis, int m, int n);
+
+// Copy mat_ZZ ppBasis to mat_RR BasisNTL and return
 mat_RR copyNTLBasisToRR (mat_ZZ ppBasis, int m, int n);
+
+// Copy pBasis into ppBasisDouble and return
+long double ** copyBasisToDouble (int ** ppBasis, int m, int n);
 
 //  Rounds a/d to nearest integer, breaking ties
 //  by rounding towards zero.  Assumes d > 0.
@@ -110,18 +132,29 @@ int BalDiv(ZZ& q, const ZZ& a, const ZZ& d);
 // Copied from NTL Library (github) 
 int ExactDiv(ZZ& qq, const ZZ& a, const ZZ& b);
 
+// Gram-Schmidt Orthogonalisation
+long double ** GSO (int ** pBasis, int m, int );
+
 // Gram-Schmidt Orthogonalisation using RR datatype
 mat_RR GSO_RR (mat_ZZ ppBasis, int m, int n);
+
+// Update the GSO information in the way required for DeepLLL
+// Algorithm 4 in Yamaguchi Yasuda NuTMic paper (NuTMic 2017)
+template <typename T1>
+int deep_LLL_GSO_update (T1 ** ppM, T1 * pB, int k , int i, int n);
 
 // Update the GSO information in the way required for DeepLLL (RR datatypes)
 // Algorithm 4 in Yamaguchi Yasuda NuTMic paper (NuTMic 2017)
 int deep_LLL_GSO_update_RR (mat_RR &ppM, vec_RR &pB, int k , int i, int n);
 
 // Find the insertion indices for SS-GGLLL
-RR RR_find_insertion_indices_dynamic_SSLLL (mat_RR ppM, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ);
+RR RR_find_insertion_indices_SSGGLLL (mat_RR ppM, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ);
+template <typename T1>
+T1 find_insertion_indices_SSGGLLL (T1 ** ppM, int ** ppBasis, T1 * pB, int n, int m, int * pK, int * pJ);
 
 //Find the insertion indices for Pot-GGLLL
-RR RR_find_insertion_indices_dynamic_PotLLL (mat_RR ppM, mat_RR ppDelta, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ);
+RR RR_find_insertion_indices_PotGGLLL (mat_RR ppM, mat_RR ppDelta, mat_ZZ ppBasis, vec_RR pB, int n, int m, int * pK, int * pJ);
+long double find_insertion_indices_PotGGLLL (long double ** ppM, int ** ppBasis, long double * pB, int n, int m, int * pK, int * pJ);
 
 // Compute Root Hermite Factor (RR)
 RR NTLrootHermiteFactor (mat_ZZ ppBasis, int m, int n); 
@@ -141,24 +174,24 @@ int NTL_LLL_check (mat_ZZ ppBasis, int m, int n, RR delta_threshold);
 // The standard LLL algorithm using NTL mat_ZZ datatype for basis
 mat_ZZ LLL_mat_ZZ (mat_ZZ ppBasis, int m, int n, RR delta, long long int * pSwaps, long long int * pReductions);
 
-// The NTL implementation of BKZ
-mat_ZZ BKZ_NTL (mat_ZZ BasisNTL, int m, int n, RR delta, long blocksize, long verbose);
-
-// The PotLLL implementation with NTL datatypes
-// At every iteration, find andinsert the vector b_k in position i such that the basis potential reduces by a sufficiently large amount
+// The PotLLL implementation with NTL datatypes / standard C datatypes
+// At every iteration, find and insert the vector b_k in position i such that the basis potential reduces by a sufficiently large amount
 mat_ZZ NTL_PotLLL (mat_ZZ ppBasis, int m, int n, RR delta, long long int * pSwaps, long long int * pReductions);
+int ** Pot_LLL_std (int ** ppBasis, int m, int n, long double delta, long long int * pSwaps, long long int * pReductions);
 
-// The S^2LLL implementation using NTL Datatypes
+// The S^2LLL implementation using NTL datatypes / standard C datatypes
 // At every iteration, find and insert the vector b_k in position i such that the value of S^2 reduces as much as possible
 mat_ZZ NTL_SS_LLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps, long long int * pReductions);
+int ** SS_LLL_std (int ** ppBasis, int m, int n, long double eta, long long int * pSwaps, long long int * pReductions);
 
-// The Pot-GGLLL implementation with NTL datatypes
+// The Pot-GGLLL implementations with NTL datatypes / standard C datatypes
 // At every iteration, find indices k, i such that the Potential of the basis is reduced by the largest amount.
 // When this happens we insert b_k in position i
 mat_ZZ NTL_PotGGLLL (mat_ZZ ppBasis, int m, int n, RR delta_threshold, long long int * pSwaps, long long int * pReductions);
+int ** PotGGLLL_std (int ** ppBasis, int m, int n, long double delta_threshold, long long int * pSwaps, long long int * pReductions);
 
-// The dynamic SSLLL implementation with NTL datatypes
+// The SS-GGLLL implementation with NTL datatypes / standard C datatypes
 // At every iteration, find indices k, i such that SS(B) - SS(C) is maximised (i.e. max reduction of SS over all indices).
 // When this happens we insert b_k in position i
 mat_ZZ NTL_SSGGLLL (mat_ZZ ppBasis, int m, int n, RR eta, long long int * pSwaps, long long int * pReductions);
-
+int ** SSGGLLL_std (int ** ppBasis, int m, int n, long double eta, long long int * pSwaps, long long int * pReductions);
