@@ -1,0 +1,10 @@
+Final   :	time=2961.39	RHF=1.01469	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2538.86	RHF=1.01461	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2548.59	RHF=1.01498	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2727.63	RHF=1.01474	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2752.95	RHF=1.01450	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2844.55	RHF=1.01467	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2378.19	RHF=1.01481	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2877.79	RHF=1.01458	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=3285.24	RHF=1.01455	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1
+Final   :	time=2948.13	RHF=1.01464	d=300	algo_num=1	prec=93	sublattice=0	switch=0	loops=2	eta=5.10000e-1

@@ -1,0 +1,25 @@
+argv[1] input_filename: 0_input_bases/1_SVP_Bases_LLL_Reduced/SVP_Basis_350_000007.txt
+argv[2] algo_num: 1
+argv[3] precision: 104
+argv[4] search_switch: 0
+argv[5] sublattice_size: 0
+argv[6] precision_correction_loops_allowed: 2
+argv[7] eta: 5.10000e-1
+
+
+Starting with precision = 104
+int_type = 3
+
+SS on input = 6.13500e13
+SS on output = 9.11625e11
+nInsertions = 26889
+max_nint_mu = 8342427
+MAX_INT - max_nint_mu = -8309660
+MAX_LONG_INT - max_nint_mu = 2139141220
+int_type = 3
+Time=6218.91	RHF=1.01552
+
+
+
+
+Final   :	time=6218.91	RHF=1.01552	d=350	algo_num=1	prec=104	sublattice=0	switch=0	loops=2	eta=5.10000e-1
